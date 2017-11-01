@@ -185,20 +185,75 @@ void rrtTree::addVertex(point x_new, point x_rand, int idx_near, double alpha, d
 
 int rrtTree::generateRRT(double x_max, double x_min, double y_max, double y_min, int K, double MaxStep) {
     //TODO
+    
+    // Initialisation was done at construction of the object
+    
+    // Loop at least K times and until the tree reach the goal
+    int loop = 0;
+    bool goalReached = false;
+    while(loop < K && !goalReached)
+    {
+        // First step : Generate a random point
+        point randPoint = randomState(x_max, x_min, y_max, y_min);
+        
+        // Get the nearest neighbor
+        int nearIndex = nearestNeighbor(randPoint, MaxStep);
+        
+        // Create a new state
+        double out[5];
+        if(newState(out, ptrTable[nearIndex]->location, randPoint, MaxStep) == 0)
+        {
+            // The new state is not valid, we collided with something !
+            // So forget about this state, and start a new one, without 
+            // incrementing loop, because we want K vertex
+            continue;
+        }
+        
+        // The new state is valid ! Create a vertex
+        point *newPoint = new point();
+        newPoint->x = out[0];
+        newPoint->y = out[1];
+        newPoint->th = out[2];
+        addVertex(*newPoint, randPoint, nearIndex, out[3], out[4]);
+        
+        // Check if we reached the goal
+        if(!goalReached)
+        {
+            for(int i = 0; i < count; i++)
+            {
+                // If the goal is 10cm away from one of the point of the tree,
+                // it's fine, we accept
+                if(distance(ptrTable[i]->location, x_goal) < 0.1)
+                {
+                    goalReached = true;
+                }
+            }    
+        }
+        
+        loop++;
+        
+        // DEBUG
+        visualizeTree();
+    }
 }
 
 point rrtTree::randomState(double x_max, double x_min, double y_max, double y_min) {
     //TODO
     
-    // Generate random coordinate within the range asked
-    float randX = x_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(x_max-x_min)));
-    float randY = y_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(y_max-x_min)));
+    do
+    {
+        // Generate random coordinate within the range asked
+        float randX = x_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(x_max-x_min)));
+        float randY = y_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(y_max-x_min)));
     
-    // Add it to a point
-    point random;
-    random.x = randX;
-    random.y = randY;
-    random.th = 0.0;    // shouldn't be used, but we initialise it still.
+        // Add it to a point
+        point random;
+        random.x = randX;
+        random.y = randY;
+        random.th = 0.0;    // shouldn't be used, but we initialise it still.
+    }while(isCollision(random, random, 0, max_alpha));
+    // Keep generating until we got a valid point
+    // We don't care of alpha and d since start and endpoint are the same
     
     return random;
 }
@@ -258,6 +313,82 @@ int rrtTree::nearestNeighbor(point x_rand) {
 
 int rrtTree::newState(double *out, point x_near, point x_rand, double MaxStep) {
     //TODO
+    
+    // Struct to store the new states randomly generated
+    std::vector<*point> randNewPoints;
+    
+    // Struct to store the control generated with the point
+    std::vector<*control> randNewControls;
+    
+    float xc, yc;
+    
+    // Generate, let's say, 20 new states
+    for(i = 0; i < 20; i++)
+    {
+        // Generate parameters
+        float alpha = -max_alpha + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(max_alpha+max_alpha)));
+        float d = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(MaxStep)));
+        
+        // Compute new point with these parameters
+        float R = L / tan(alpha);
+        float beta = d / R;
+        xc = x_near.x - R * sin(x_near.th);
+        yc = x_near.y + R * cos(x_near.th); 
+        
+        point *xNew = new point();
+        control *cNew = new control();
+        
+        xNew->th = x_near.th + beta;
+        xNew->x = xc + R * sin(xNew->th);
+        xNew->y = xc - R * cos(xNew->th);
+        
+        cNew->alpha = alpha;
+        cNew->d = d;
+        
+        // Add it to our list of randomly generated point/control
+        randNewPoints.push_back(xNew);
+        randNewControls.push_back(cNew);
+        
+        xNew = NULL;
+        cNew = NULL;
+    }
+    
+    // We have generated them. Now choose the closest
+    std::vector<*point>::iterator itP = randNewPoints.begin();
+    std::vector<*control>::iterator itC = randNewControls.begin();
+    
+    point *bestPoint = randNewPoints.begin();
+    control *bestControl = randNewControls.begin();
+    float bestDistance = distance(x_rand, *bestPoint);
+    
+    for(itP = randNewPoints.begin(); itP != randNewPoints.end(); itP++)
+    {
+        if(distance(x_rand, *itP) < bestDistance)
+        {
+            bestPoint = itP;
+            bestControl = itC;
+            bestDistance = distance(x_rand, *bestPoint);
+        }
+        itC++;
+    }
+    
+    // Now we have the closest point among the 20 randomly generated. 
+    // So set the output.
+    out[0] = bestPoint->x;
+    out[1] = bestPoint->y;
+    out[2] = bestPoint->th;
+    out[3] = bestControl->alpha;
+    out[4] = bestControl->d;
+    
+    // Return of the function : if it collides or not
+    if(isCollision(x_near, *bestPoint, bestControl->d, bestControl->alpha))
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
 
 bool rrtTree::isCollision(point x1, point x2, double d, double alpha) {
@@ -284,7 +415,7 @@ bool rrtTree::isCollision(point x1, point x2, double d, double alpha) {
     xPrime.th = x1.th;
 
     // Then, compute all the way from point x1 to point x2
-    while(distance(xPrime, x2) < 0.2)   // Consider they are the same under 0.2m
+    while(distance(xPrime, x2) > 0.2)   // Consider they are the same under 0.2m
     {
         // While we didn't iterate through all way
         // Compute each new point
@@ -333,14 +464,53 @@ bool rrtTree::isCollision(point x1, point x2, double d, double alpha) {
     {
         if(map.at<uchar>(*itI, *itJ) == 255)
         {
-            return false;
+            return true;
         }
         itJ++;
     }
     
-    return true;
+    return false;
 }
 
 std::vector<traj> rrtTree::backtracking_traj(){
     //TODO
+    
+    // First, find the nearest node to the goal
+    float bestDistance = distance(ptrTable[0]->location, x_goal);
+    int bestI = 0;
+    for(int i = 0; i < count; i++)
+    {
+        if(distance(ptrTable[i]->location, x_goal) < bestDistance)
+        {
+            bestDistance = distance(ptrTable[i]->location, x_goal);
+            bestI = i;
+        }
+    }
+    
+    // Then, track parents one by one and add them to the traj
+    std::vector<traj> path;
+    node currentNode = ptrTable[bestI];
+    while(currentNode.idx_parent != NULL)
+    {
+        // Create equivalent 'traj' of the current node
+        traj *trajPoint = new traj();
+        trajPoint->x = currentNode.location.x;
+        trajPoint->y = currentNode.location.y;
+        trajPoint->th = currentNode.location.th;
+        trajPoint->d = currentNode.d;
+        trajPoint->alpha = currentNode.alpha;
+        
+        // Add it to our vector
+        path.push_back(*trajPoint);
+        
+        trajPoint = NULL;
+        
+        // Go to the parent
+        currentNode = ptrTable[currentNode.idx_parent];
+    }
+    
+    // DEBUG
+    visualizeTree(path);
+    
+    return path;
 }

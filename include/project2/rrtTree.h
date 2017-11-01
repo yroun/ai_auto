@@ -33,7 +33,7 @@ private:
     cv::Mat map;
     cv::Mat map_original;
     double map_origin_x, map_origin_y;
-    double res = 0.05;
+    double res;
     node *ptrTable[20000];
 
     cv::Mat addMargin(cv::Mat map, int margin);

@@ -15,6 +15,9 @@
 #include <tf/transform_datatypes.h>
 #include <project2/pid.h>
 #include <math.h>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
 #include <pwd.h>
 
 //map spec
@@ -58,6 +61,9 @@ void callback_state(gazebo_msgs::ModelStatesConstPtr msgs);
 void setcmdvel(double v, double w);
 
 int main(int argc, char** argv){
+    // Seed Random
+    srand (static_cast <unsigned> (time(0)));
+    
     ros::init(argc, argv, "rrt_main");
     ros::NodeHandle n;
 
@@ -236,6 +242,29 @@ void generate_path_RRT()
      * 4.  when you store path, you have to reverse the order of points in the generated path since BACKTRACKING makes a path in a reverse order (goal -> start).
      * 5. end
      */
+     
+    // Iterate through all way point
+    std::vector<point>::iterator it;
+    std::vector<point>::iterator prev = waypoints.begin();
+    for(it = waypoints.begin() + 1; it != waypoints.end(); it++)
+    {
+        // Create the tree for the current waypoint
+        rrtTree t = rrtTree(*prev, *it, map, map_origin_x, map_origin_y, res, margin);
+        
+        // Generate the RRT Tree
+        t.generateRRT(world_x_max, world_x_min, world_y_max, world_y_min, K, MaxStep);
+        
+        // Get the backtracking path
+        std::vector<traj> pathI = backtracking_traj();
+        
+        // Reverse the path, since it's not the write way
+        std::reverse(pathI.begin(), pathI.end());
+        
+        // Add it to the total path
+        path_RRT.insert(path_RRT.end(), pathI.begin(), pathI.end());
+        
+        prev++;
+    }
 }
 
 void set_waypoints()
