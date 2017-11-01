@@ -189,6 +189,18 @@ int rrtTree::generateRRT(double x_max, double x_min, double y_max, double y_min,
 
 point rrtTree::randomState(double x_max, double x_min, double y_max, double y_min) {
     //TODO
+    
+    // Generate random coordinate within the range asked
+    float randX = x_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(x_max-x_min)));
+    float randY = y_min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(y_max-x_min)));
+    
+    // Add it to a point
+    point random;
+    random.x = randX;
+    random.y = randY;
+    random.th = 0.0;    // shouldn't be used, but we initialise it still.
+    
+    return random;
 }
 
 int rrtTree::nearestNeighbor(point x_rand, double MaxStep) {
@@ -248,16 +260,85 @@ int rrtTree::newState(double *out, point x_near, point x_rand, double MaxStep) {
     //TODO
 }
 
-bool rrtTree::isCollision(point x1, point x2, double d, double R) {
+bool rrtTree::isCollision(point x1, point x2, double d, double alpha) {
     //TODO
 
-    // First of all, compute the i and j for the 2 points
-    int i1 = (x1.x / res) + 400;
-    int j1 = (x1.y / res) + 400;
-    int i2 = (x2.x / res) + 400;
-    int j2 = (x2.y / res) + 400;
+    // First of all, set up a structure to put all the area of the map 
+    // we have to check
+    std::vector<int> i;
+    std::vector<int> j;
+    int iPrime, jPrime;
 
-    // TODO
+    // Put the starting point 
+    i.push_back(((int)floor(x1.x / res)) + map_origin_x);
+    j.push_back(((int)floor(x1.y / res)) + map_origin_y);
+    
+    // Compute the data we need to compute every point of the path
+    float R = L / tan(alpha);
+    float beta = d / R;
+    
+    point xc;
+    point xPrime;
+    xPrime.x = x1.x;    // Starting point
+    xPrime.y = x1.y;
+    xPrime.th = x1.th;
+
+    // Then, compute all the way from point x1 to point x2
+    while(distance(xPrime, x2) < 0.2)   // Consider they are the same under 0.2m
+    {
+        // While we didn't iterate through all way
+        // Compute each new point
+        
+        // 2 cases : either keep turning, either we are in the good direction
+        // so go straight
+        if(abs(getDirection(xPrime, x2) - xPrime.th) < (M_PI / 50))
+        {
+            // We are in the ~appropriate direction (2% of pi of error), so
+            // go straight. We cannot go exactly in the good direction since 
+            // delta t is not infinitely small
+            xPrime.x = xc.x + d * sin(xPrime.th);
+            xPrime.y = xc.y + d * cos(xPrime.th);
+        }
+        else
+        {
+            // Keep turning
+            xc.x = xPrime.x - R * sin(xPrime.th);
+            xc.y = xPrime.y + R * cos(xPrime.th); 
+            
+            xPrime.th = xPrime.th + beta;
+            xPrime.x = xc.x + R * sin(xPrime.th);
+            xPrime.y = xc.y - R * cos(xPrime.th);
+        }
+        
+        // After computing a new point, we can check wheter it's in an area
+        // of the matrix already counter or not
+        
+        // Compute the value of the new point in the matrix plan
+        iPrime = ((int)floor(xPrime.x / res)) + map_origin_x;
+        jPrime = ((int)floor(xPrime.y / res)) + map_origin_y;
+        
+        // And only if it's different, push it back to the structure
+        if(iPrime != i.back() || jPrime != j.back())
+        {
+            i.push_back(iPrime);
+            j.push_back(jPrime);
+        }
+    }
+    
+    // Now, we have the full path to point 1 to point 2. Just check if there
+    // is some obstacle in the middle or not
+    std::vector<int>::iterator itI = i.begin();
+    std::vector<int>::iterator itJ = j.begin();
+    for(itI = i.begin(); itI != i.end(); itI++)
+    {
+        if(map.at<uchar>(*itI, *itJ) == 255)
+        {
+            return false;
+        }
+        itJ++;
+    }
+    
+    return true;
 }
 
 std::vector<traj> rrtTree::backtracking_traj(){

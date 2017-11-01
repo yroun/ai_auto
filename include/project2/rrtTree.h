@@ -40,7 +40,7 @@ private:
     void addVertex(point x_new, point x_rand, int idx_near, double alpha, double d);
     int nearestNeighbor(point x_rand, double MaxStep);
     int nearestNeighbor(point x_rand);
-    bool isCollision(point x1, point x2, double d, double R);
+    bool isCollision(point x1, point x2, double d, double alpha);
     point randomState(double x_max, double x_min, double y_max, double y_min);
     int newState(double *out, point x_near, point x_rand, double MaxStep);
 
