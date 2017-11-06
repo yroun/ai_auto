@@ -1,3 +1,7 @@
+#pragma once
+
+#ifndef RRT_TREE_H
+#define RRT_TREE_H
 #include <iostream>
 #include <cstdlib>
 #include <climits>
@@ -13,6 +17,8 @@
 #include <project2/control.h>
 #include <project2/traj.h>
 #endif
+
+#include "project2/functions.h"
 
 
 class rrtTree
@@ -35,6 +41,7 @@ private:
     double map_origin_x, map_origin_y;
     double res;
     node *ptrTable[20000];
+    int goalBias;
 
     cv::Mat addMargin(cv::Mat map, int margin);
     void addVertex(point x_new, point x_rand, int idx_near, double alpha, double d);
@@ -55,3 +62,4 @@ public:
     int generateRRT(double x_max, double x_min, double y_max, double y_min, int K, double MaxStep);
     std::vector<traj> backtracking_traj();
 };
+#endif
