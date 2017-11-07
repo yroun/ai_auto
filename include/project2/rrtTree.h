@@ -42,11 +42,13 @@ private:
     double res;
     node *ptrTable[20000];
     int goalBias;
+    float mapSize;
 
     cv::Mat addMargin(cv::Mat map, int margin);
     void addVertex(point x_new, point x_rand, int idx_near, double alpha, double d);
     int nearestNeighbor(point x_rand, double MaxStep);
     int nearestNeighbor(point x_rand);
+    int nearestNeighbor2(point x_rand, double MaxStep);
     bool isCollision(point x1, point x2, double d, double alpha);
     point randomState(double x_max, double x_min, double y_max, double y_min);
     int newState(double *out, point x_near, point x_rand, double MaxStep);

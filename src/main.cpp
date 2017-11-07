@@ -68,11 +68,11 @@ void setcmdvel(double v, double w);
 int main(int argc, char** argv){
     // Seed Random
     srand (static_cast <unsigned> (time(0)));
-
+/*
     // DEBUG
     char* userT = getpwuid(getuid())->pw_name;
     map = cv::imread((std::string("/home/") +
-		      std::string(userT) + 
+		      std::string(userT) +
                       std::string("/catkin_ws/src/project2/src/ground_truth_map.pgm")).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 
     map_y_range = map.cols;
@@ -90,13 +90,15 @@ int main(int argc, char** argv){
     generate_path_RRT();
     printf("Generate RRT\n");
     return 0;
-    
-    //ros::init(argc, argv, "rrt_main");
+    */
+
+    ros::init(argc, argv, "rrt_main");
     ros::NodeHandle n;
 
     // Initialize topics
-    ros::Subscriber gazebo_pose_sub = n.subscribe("/gazebo/model_states",100,callback_state);
+    ros::Subscriber gazebo_pose_sub = n.subscribe("/gazebo/model_states",100, callback_state);
     ros::Publisher cmd_vel_pub = n.advertise<ackermann_msgs::AckermannDriveStamped>("/vesc/low_level/ackermann_cmd_mux/output",100);
+    // ros::Publisher cmd_vel_pub = n.advertise<ackermann_msgs::AckermannDriveStamped>("/vesc/high_level/ackermann_cmd_mux/input/nav_0",1);
     ros::ServiceClient gazebo_spawn = n.serviceClient<gazebo_msgs::SpawnModel>("/gazebo/spawn_urdf_model");
     ros::ServiceClient gazebo_set = n.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
     printf("Initialize topics\n");
@@ -105,7 +107,7 @@ int main(int argc, char** argv){
 
     char* user = getpwuid(getuid())->pw_name;
     map = cv::imread((std::string("/home/") +
-		      std::string(user) + 
+		      std::string(user) +
                       std::string("/catkin_ws/src/project2/src/ground_truth_map.pgm")).c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 
     map_y_range = map.cols;
@@ -135,7 +137,7 @@ int main(int argc, char** argv){
     printf("Generate RRT\n");
 
     // Initialise the iterator to access the right point of the path
-    std::vector<traj>::iterator currentGoal = path_RRT.begin();
+    std::vector<traj>::iterator currentGoal = path_RRT.end();
     traj prevGoal = *currentGoal;
 
     // FSM
@@ -150,10 +152,10 @@ int main(int argc, char** argv){
             look_ahead_idx = 0;
 	    printf("path size : %d\n", static_cast<int>(path_RRT.size()));
             //visualize path
-	
+
             for(int i = 0; i < path_RRT.size(); i++){
-		
-	    
+
+
                 gazebo_msgs::SpawnModel model;
                 model.request.model_xml = std::string("<robot name=\"simple_ball\">") +
 			std::string("<static>true</static>") +
@@ -199,7 +201,7 @@ int main(int argc, char** argv){
                 ros::spinOnce();
             }
             printf("Spawn path\n");
-	
+
             //initialize robot position
             geometry_msgs::Pose model_pose;
             model_pose.position.x = waypoints[0].x;
@@ -236,6 +238,7 @@ int main(int argc, char** argv){
         } break;
 
         case RUNNING: {
+
 	    //TODO
 	    /*
 		1. make control following point in the variable "path_RRT"
@@ -248,7 +251,23 @@ int main(int argc, char** argv){
 			finish RUNNING (state = FINISH)
         */
             // Step 1 : Update the steering angle with PID algorithm
-            setcmdvel(MAX_SPEED, pid_ctrl.get_control(robot_pose, prevGoal, *currentGoal));
+            // std::cout << \
+            //     "prevGoal(" << prevGoal.x << \
+            //     "," << prevGoal.y << ")" << \
+            //     " currentGoal(" << (*currentGoal).x << "," << (*currentGoal).y << ")"<< \
+            //     std::endl;
+
+            // setcmdvel(MAX_SPEED, pid_ctrl.get_control(robot_pose, prevGoal, *currentGoal));
+            double turn = pid_ctrl.get_control(robot_pose, prevGoal, *currentGoal);
+            double speed = 1.0;
+            std::cout << "Turn <" << turn << \
+                " (" << robot_pose.x << "," << robot_pose.y << ")>>(" << (*currentGoal).x << "," << (*currentGoal).y << ") " \
+                "with Speed " << speed << \
+                std::endl;
+
+            cmd.drive.steering_angle = turn;
+            // cmd.drive.speed = MAX_SPEED;
+            cmd.drive.speed = speed;
 
             // Step 2 : Publish the new data
             cmd_vel_pub.publish(cmd);
@@ -258,6 +277,7 @@ int main(int argc, char** argv){
             goal.x = currentGoal->x;
             goal.y = currentGoal->y;
             goal.th = currentGoal->th;
+
             if(distance(robot_pose, goal) < 0.2)
             {
                 //DEBUG
@@ -311,7 +331,7 @@ void generate_path_RRT()
      * 4.  when you store path, you have to reverse the order of points in the generated path since BACKTRACKING makes a path in a reverse order (goal -> start).
      * 5. end
      */
-     
+
     // Iterate through all way point
     std::vector<point>::iterator it;
     std::vector<point>::iterator prev = waypoints.begin();
@@ -324,27 +344,27 @@ void generate_path_RRT()
         rrtTree t = rrtTree(*prev, *it, map, map_origin_x, map_origin_y, res, margin);
         // DEBUG
     std::cout << "rrtTree created" << std::endl;
-        
+
         // Generate the RRT Tree
         t.generateRRT(world_x_max, world_x_min, world_y_max, world_y_min, K, MaxStep);
         // DEBUG
     std::cout << "rrt generated" << std::endl;
-        
+
         // Get the backtracking path
         std::vector<traj> pathI = t.backtracking_traj();
         // DEBUG
     std::cout << "Backtracking" << std::endl;
-        
+
         // Reverse the path, since it's not the write way
         std::reverse(pathI.begin(), pathI.end());
         // DEBUG
     std::cout << "reversed" << std::endl;
-        
+
         // Add it to the total path
         path_RRT.insert(path_RRT.end(), pathI.begin(), pathI.end());
         // DEBUG
     std::cout << "Inserted" << std::endl;
-        
+
         prev++;
     }
 }
