@@ -17,6 +17,7 @@ public:
 
     //this function makes control output using arguments which are the current value and the target setpoint.
     float get_control(point car_pose, traj prev_goal, traj cur_goal);
+    double set_speed(double min_speed, double max_speed, point car_pose, traj cur_goal, double rad_to_turn);
     void initErrorSum();
     void setWeight(point car, point goal);
 private:

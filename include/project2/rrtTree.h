@@ -53,6 +53,9 @@ private:
     point randomState(double x_max, double x_min, double y_max, double y_min);
     int newState(double *out, point x_near, point x_rand, double MaxStep);
 
+    /* Custom */
+    int setParentOfVertex(int idx, int idx_parent);
+
 public:
     rrtTree();
     rrtTree(point x_init, point x_goal, cv::Mat map, double map_origin_x, double map_origin_y, double res, int margin);
@@ -63,5 +66,8 @@ public:
     void visualizeTree(std::vector<traj> path);
     int generateRRT(double x_max, double x_min, double y_max, double y_min, int K, double MaxStep);
     std::vector<traj> backtracking_traj();
+
+    /* Custom */
+    int optimizeTree();
 };
 #endif

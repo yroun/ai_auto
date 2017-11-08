@@ -194,7 +194,7 @@ int rrtTree::generateRRT(double x_max, double x_min, double y_max, double y_min,
 
     // Loop at least K times and until the tree reach the goal
     int loop = 0;
-    bool goalReached = false;
+    int goalReached = false;
 
     mapSize = x_max - x_min;
 
@@ -283,6 +283,17 @@ int rrtTree::generateRRT(double x_max, double x_min, double y_max, double y_min,
         //std::cout << "Pause" << std::endl;
         //std::cin.get();
     }
+
+    return goalReached;
+}
+
+int rrtTree::setParentOfVertex(int idx, int idx_parent) {
+
+    if (idx < 1 || idx > count - 1) { return 0; }
+
+    ptrTable[idx]->idx_parent = idx_parent;
+
+    return 1;
 }
 
 point rrtTree::randomState(double x_max, double x_min, double y_max, double y_min) {
@@ -432,7 +443,7 @@ int rrtTree::newState(double *out, point x_near, point x_rand, double MaxStep) {
     {
         // Generate parameters
         float alpha = -max_alpha + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(max_alpha+max_alpha)));
-        float d = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(MaxStep)));
+        float d = 0.5 + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX/(MaxStep-0.5)));
 
         // Compute new point with these parameters
         float R = L / tan(alpha);
@@ -595,6 +606,87 @@ bool rrtTree::isCollision(point x1, point x2, double d, double alpha) {
     return false;
 }
 
+int rrtTree::optimizeTree() {
+    // Remove close nodes.
+    int idx = count - 1;
+    while(idx != NULL)
+    {
+        int idx_parent = ptrTable[idx]->idx_parent;
+        int idx_parent_of_parent = ptrTable[idx_parent]->idx_parent;
+        double dist = distance(ptrTable[idx]->location, ptrTable[idx_parent]->location);
+        if (dist < 1 && idx_parent_of_parent != NULL) {
+            setParentOfVertex(idx, idx_parent_of_parent);
+        }
+        idx = idx_parent;
+    }
+
+    return 1;
+
+    // int idx = count - 1;
+    // int numOfCands = 0;
+    //
+    // while(idx != NULL)
+    // {
+    //     ++numOfCands;
+    //     idx = ptrTable[idx]->idx_parent;
+    // }
+    // std::cout << "Count!::" << numOfCands << std::endl;
+    //
+    // int idxs[numOfCands] = {0,};
+    // int idx_cand = count - 1;
+    // int it = numOfCands - 1;
+    // while(idx_cand != NULL)
+    // {
+    //     int idx_parent_of_cand = ptrTable[idx_cand]->idx_parent;
+    //     idxs[it] = idx_parent_of_cand;
+    //     idx_cand = idx_parent_of_cand;
+    //     --it;
+    // }
+
+    // std::cout << "[Idxs]=[";
+    // for (int n=0; n<numOfCands; ++n) { std::cout << idxs[n] << ", "; }
+    // std::cout << "]" << std::endl;
+
+
+    // for (int n=0; n<numOfCands-1; ++n)
+    // {
+    //     std::cout << n << "th trial" << std::endl;
+        // double totDist = 0;
+        // double compDist = 0;
+        //
+        // int idx_cand = count - 1;
+        // int idx_parent_of_cand = 0;
+        // while(idx_cand != NULL) {
+        //     std::cout << idx_cand << std::endl;
+        //     idx_parent_of_cand = ptrTable[idx_cand]->idx_parent;
+        //     totDist += distance(ptrTable[idx_cand]->location, ptrTable[idx_parent_of_cand]->location);
+        //     idx_cand = idx_parent_of_cand;
+        // }
+        //
+        // idx_cand = count - 1;
+        // while(idx_cand != NULL) {
+        //     idx_parent_of_cand = ptrTable[idx_cand]->idx_parent;
+        //     if (idx_cand != idxs[n]) {
+        //         compDist += distance(ptrTable[idx_cand]->location, ptrTable[idx_parent_of_cand]->location);
+        //     }
+        //     idx_cand = idx_parent_of_cand;
+        // }
+        //
+        // std::cout << \
+        //     n << "th brute-force optimizing distance::" << totDist << ">>>"<< compDist;
+        //
+        // if (compDist < totDist) {
+        //     int valid = setParentOfVertex(idxs[n+1], idxs[n-1]);
+        //     if (valid) {
+        //         std::cout << " -> Skipped" << std::endl;
+        //     }
+        //     else {
+        //         std::cout << " -> Remained" << std::endl;
+        //     }
+        // }
+    // }
+}
+
 std::vector<traj> rrtTree::backtracking_traj(){
     //TODO
 
@@ -654,7 +746,7 @@ std::vector<traj> rrtTree::backtracking_traj(){
     std::reverse(path.begin(), path.end());
 
     // DEBUG
-    visualizeTree(path);
+    // visualizeTree(path);
 
     return path;
 }

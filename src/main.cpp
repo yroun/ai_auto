@@ -137,7 +137,7 @@ int main(int argc, char** argv){
     printf("Generate RRT\n");
 
     // Initialise the iterator to access the right point of the path
-    std::vector<traj>::iterator currentGoal = path_RRT.end();
+    std::vector<traj>::iterator currentGoal = path_RRT.begin();
     traj prevGoal = *currentGoal;
 
     // FSM
@@ -257,17 +257,14 @@ int main(int argc, char** argv){
             //     " currentGoal(" << (*currentGoal).x << "," << (*currentGoal).y << ")"<< \
             //     std::endl;
 
-            // setcmdvel(MAX_SPEED, pid_ctrl.get_control(robot_pose, prevGoal, *currentGoal));
+
             double turn = pid_ctrl.get_control(robot_pose, prevGoal, *currentGoal);
-            double speed = 1.0;
+            double speed = pid_ctrl.set_speed(1.0, MAX_SPEED, robot_pose, *currentGoal, turn);
             std::cout << "Turn <" << turn << \
                 " (" << robot_pose.x << "," << robot_pose.y << ")>>(" << (*currentGoal).x << "," << (*currentGoal).y << ") " \
                 "with Speed " << speed << \
                 std::endl;
-
-            cmd.drive.steering_angle = turn;
-            // cmd.drive.speed = MAX_SPEED;
-            cmd.drive.speed = speed;
+            setcmdvel(speed, turn);
 
             // Step 2 : Publish the new data
             cmd_vel_pub.publish(cmd);
@@ -331,7 +328,38 @@ void generate_path_RRT()
      * 4.  when you store path, you have to reverse the order of points in the generated path since BACKTRACKING makes a path in a reverse order (goal -> start).
      * 5. end
      */
+     // Iterate through all way point
+     std::vector<point>::iterator it = waypoints.begin();
+     point lastPoint = *it;
 
+     for(it = waypoints.begin() + 1; it != waypoints.end(); it++)
+     {
+         // Create the tree for the current waypoint
+         rrtTree t = rrtTree(lastPoint, *it, map, map_origin_x, map_origin_y, res, margin);
+
+         // Generate the RRT Tree
+         int isRRTValid = t.generateRRT(world_x_max, world_x_min, world_y_max, world_y_min, K, MaxStep);
+
+         if (isRRTValid) { std::cout << "[Err] RRT path is not valid." << std::endl; }
+
+         //DEBUG
+        //  t.visualizeTree(pathI);
+        //  std::cin.get();
+         t.optimizeTree();
+
+         // Get the backtracking path
+         std::vector<traj> pathI = t.backtracking_traj();
+
+         // Add it to the total path
+         path_RRT.insert(path_RRT.end(), pathI.begin(), pathI.end());
+
+         // Update for the next loop
+         lastPoint.x = path_RRT.back().x;
+         lastPoint.y = path_RRT.back().y;
+         lastPoint.th = path_RRT.back().th;
+     }
+     /*
+     * Old codes
     // Iterate through all way point
     std::vector<point>::iterator it;
     std::vector<point>::iterator prev = waypoints.begin();
@@ -356,7 +384,7 @@ void generate_path_RRT()
     std::cout << "Backtracking" << std::endl;
 
         // Reverse the path, since it's not the write way
-        std::reverse(pathI.begin(), pathI.end());
+        // std::reverse(pathI.begin(), pathI.end());
         // DEBUG
     std::cout << "reversed" << std::endl;
 
@@ -367,6 +395,7 @@ void generate_path_RRT()
 
         prev++;
     }
+    */
 }
 
 void set_waypoints()

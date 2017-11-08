@@ -22,14 +22,25 @@ float getDirection(point car_pose, point goal_pose)
         angle = angle;
     }
     else if (dx < 0 && dy >= 0) {
+        //angle = M_PI + angle;
         angle = M_PI + angle;
     }
     else if (dx < 0 && dy < 0) {
+        // angle = -(M_PI - angle);
         angle = -(M_PI - angle);
     }
     else {
         angle = angle;
     }
+
+    // if(angle < -M_PI)
+    // {
+    //     angle += 2 * M_PI;  // Equivalent
+    // }
+    // if(angle > M_PI)
+    // {
+    //     angle -= 2 * M_PI;  // Equivalent
+    // }
 
     return angle;
 }
